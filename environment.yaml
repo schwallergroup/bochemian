@@ -1,0 +1,26 @@
+name: bochemian
+channels:
+  - defaults
+  - conda-forge
+  - pytorch
+dependencies:
+  - python=3.10
+  - pytorch
+  - pytorch-lightning
+  - pandas
+  - scikit-learn
+  - pip
+  - pip:
+    - -e .
+    - -e ../gauche
+    - rxnfp --no-deps
+    - drfp
+    - transformers
+dev_dependencies:
+  - pre-commit
+  - tox
+  - black
+  - isort
+  - flake8
+  - sphinx
+  - coverage
