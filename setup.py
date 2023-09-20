@@ -13,7 +13,7 @@ if __name__ == "__main__":
         setup(
             name="bochemian",
             use_scm_version={"version_scheme": "no-guess-dev"},
-            packages=find_packages(include=["chaos", "gprotorch"]),
+            packages=find_packages(include=["bochemian", "gprotorch"]),
         )
     except:  # noqa
         print(

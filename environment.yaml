@@ -19,18 +19,11 @@ dependencies:
   - matplotlib
   - pip:
     - -e .
-    # - -e ../gauche
-    # - rxnfp --no-deps
+    - botorch
+    - selfies
+    - graphein==1.7.3
+    - torch-geometric==1.7.2
+    - rdkit
     - drfp
     - transformers
     - jsonargparse[signatures]
-    - graphein==1.5.1
-    - torch-geometric==1.7.2
-dev_dependencies:
-  - pre-commit
-  - tox
-  - black
-  - isort
-  - flake8
-  - sphinx
-  - coverage
