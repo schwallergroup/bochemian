@@ -1,0 +1,22 @@
+details:
+  - iupac_name
+  - molecular_formula
+  - xlogp
+  - tpsa
+  - heavy_atom_count
+  - h_acceptor_count
+  - h_donor_count
+  - rotatable_bond_count
+  - ring_count
+  - complexity
+
+components:
+  - ligand
+  - aryl halide
+  - additive
+  - base
+
+template: |
+  Reaction Setup
+  The following solutions were prepared in DMSO:
+  {component_details}

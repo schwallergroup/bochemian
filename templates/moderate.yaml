@@ -1,0 +1,14 @@
+details:
+  - iupac_name
+  - molecular_formula
+  
+components:
+  - ligand
+  - aryl halide
+  - additive
+  - base
+
+template: |
+  Reaction Setup
+  The following solutions were prepared in DMSO:
+  {component_details}
