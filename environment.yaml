@@ -20,7 +20,7 @@ dependencies:
   - pip:
     - -e .
     # - -e ../gauche
-    - rxnfp --no-deps
+    # - rxnfp --no-deps
     - drfp
     - transformers
     - jsonargparse[signatures]
