@@ -27,3 +27,6 @@ dependencies:
     - drfp
     - transformers
     - jsonargparse[signatures]
+    - openai
+    - InstructorEmbedding
+    - sentence-transformers
