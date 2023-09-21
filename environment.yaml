@@ -1,4 +1,4 @@
-name: bochemian
+name: test_bochemian
 channels:
   - defaults
   - conda-forge
