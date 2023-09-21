@@ -208,7 +208,7 @@ class BotorchOptimizer:
     def default_surrogate_model_config():
         # Return default surrogate model config
         return {
-            "class_path": "chaos.surrogate_models.gp.SimpleGP",
+            "class_path": "bochemian.surrogate_models.gp.SimpleGP",
             "init_args": {
                 "covar_module": {
                     "class_path": "gpytorch.kernels.ScaleKernel",
