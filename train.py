@@ -182,6 +182,7 @@ if __name__ == "__main__":
     # Parse the arguments
     args = parser.parse_args()
     set_seeds(args["seed"])
+    
 
     wandb_config = flatten_namespace(args)
     run = wandb.init(project="bochemian", config=wandb_config)
