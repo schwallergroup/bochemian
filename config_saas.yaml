@@ -1,0 +1,36 @@
+data:
+  class_path: bochemian.data.module.BaseDataModule
+  init_args:
+    data_path: data/processed/bh_reaction_1_procedure_template_full.csv
+    input_column: ada_embeddings
+    target_column: yield
+    featurizer:
+      class_path: bochemian.data.module.Featurizer
+      init_args:
+        task: reaction_optimization
+        representation: precalculated
+        bond_radius: 7
+        nBits: 512
+    initializer:
+      class_path: bochemian.initialization.initializers.BOInitializer
+      init_args:
+        method: true_random
+        metric: jaccard
+        n_clusters: 10
+        init: k-means++
+        use_pca: null
+        seed: null
+bo:
+  class_path: bochemian.bo.optimizer.BotorchOptimizer
+  init_args:
+    batch_strategy: 'kriging'
+    batch_size: 1
+acquisition:
+  class_path: "botorch.acquisition.UpperConfidenceBound"
+  init_args: 
+    maximize: True
+    beta: 2
+surrogate_model:
+  class_path: bochemian.surrogate_models.gp.SaaSGP
+n_iters: 20
+seed: 1

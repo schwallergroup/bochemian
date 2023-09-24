@@ -128,3 +128,52 @@ class SimpleGP(SurrogateModel, SingleTaskGP):
         with torch.no_grad():
             posterior = self.posterior(x, observation_noise=observation_noise)
         return (posterior.mean, posterior.variance) if return_var else posterior.mean
+
+
+from botorch.models.fully_bayesian import SaasFullyBayesianSingleTaskGP
+from botorch import fit_fully_bayesian_model_nuts
+
+
+class SaaSGP(SurrogateModel, SaasFullyBayesianSingleTaskGP):
+    def __init__(
+        self,
+        train_x: Union[np.ndarray, torch.Tensor] = None,
+        train_y: Union[np.ndarray, torch.Tensor] = None,
+        standardize: bool = True,
+        normalize: bool = False,
+        warmup_steps: int = 512,
+        num_samples: int = 256,
+        thinning: int = 16,
+    ):
+        super().__init__(
+            train_x,
+            train_y,
+            outcome_transform=Standardize(train_y.shape[-1]) if standardize else None,
+            input_transform=Normalize(train_x.shape[-1]) if normalize else None,
+        )
+        self.warmup_steps = warmup_steps
+        self.num_samples = num_samples
+        self.thinning = thinning
+
+    def fit(self, train_X, train_Y):
+        self.train()
+        try:
+            with debug(True):
+                fit_fully_bayesian_model_nuts(
+                    self,
+                    warmup_steps=self.warmup_steps,
+                    num_samples=self.num_samples,
+                    thinning=self.thinning,
+                    disable_progbar=True,
+                )
+
+        except Exception as e:
+            print(f"Exception caught during fit: {str(e)}")
+
+    def predict(self, x, observation_noise=False, return_var=True):
+        self.eval()  # set the model to evaluation mode
+        with torch.no_grad():
+            posterior = self.posterior(x)
+            mixture_mean = posterior.mixture_mean
+            mixture_variance = posterior.mixture_variance
+        return (mixture_mean, mixture_variance) if return_var else mixture_mean
