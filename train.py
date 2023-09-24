@@ -1,7 +1,5 @@
-from bochemian.data.module import BaseDataModule, Featurizer
-from bochemian.initialization.initializers import BOInitializer
+from bochemian.data.module import BaseDataModule
 from bochemian.bo.optimizer import BotorchOptimizer
-from bochemian.bo.module import BoModule
 import torch
 from pytorch_lightning import seed_everything
 import wandb
@@ -14,9 +12,6 @@ from jsonargparse import (
 )
 from bochemian.utils import instantiate_class
 
-import os
-import random
-import numpy as np
 
 from bochemian.gprotorch.metrics import (
     negative_log_predictive_density,
