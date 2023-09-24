@@ -1,4 +1,5 @@
 from typing import Any, Dict, Optional
+from bochemian.data.utils import torch_delete_rows
 import torch
 import warnings
 from botorch.optim import optimize_acqf
@@ -40,7 +41,7 @@ class BotorchOptimizer:
         self.heldout_x = heldout_x.to(**tkwargs) if heldout_x is not None else None
         if self.heldout_x is not None:
             if heldout_y is not None:
-                self.heldout_y = heldout_y
+                self.heldout_y = heldout_y.to(**tkwargs)
             else:
                 self.heldout_y = torch.full(
                     (len(self.heldout_x), 1),
@@ -57,7 +58,8 @@ class BotorchOptimizer:
         train_x = train_x.to(**tkwargs) if train_x is not None else None
         train_y = train_y.to(**tkwargs) if train_y is not None else None
 
-        self.tell(train_x, train_y)
+        if train_x is not None and train_y is not None:
+            self.tell(train_x, train_y)
         self.tkwargs = tkwargs
 
     def lie_to_me(self, candidate, train_y, strategy="kriging"):
@@ -106,9 +108,12 @@ class BotorchOptimizer:
                 q=1,
             )
             candidates.append(candidate)
+            if n_points == 1:
+                return candidates
             y_lie = self.lie_to_me(
                 candidate, self.train_y, strategy=self.batch_strategy
             )
+
             self.tell(candidate, y_lie, lie=True)
 
         self.train_x = self.train_x[:-n_points]
@@ -121,27 +126,21 @@ class BotorchOptimizer:
         self.train_y = torch.cat([self.train_y, y]) if self.train_y is not None else y
 
         if len(self.pending_x) > 0 and not lie:
-            for point in x:
-                self.pending_x = [
-                    p for p in self.pending_x if not torch.equal(p, point)
-                ]
+            points_set = {tuple(point.numpy()) for point in x}
+            self.pending_x = [
+                p for p in self.pending_x if tuple(p.numpy()) not in points_set
+            ]
+
         # would have to be changed because the experiment might not be exactly the same
 
         # If heldout_x and heldout_y are not None, remove the points in x from heldout_x and heldout_y
         if self.heldout_x is not None and self.heldout_y is not None and not lie:
-            for point in x:
-                index_tensor = (self.heldout_x == point).all(dim=1).nonzero().squeeze()
-                if index_tensor.numel() == 0:
-                    # No match found
-                    continue
-                index = index_tensor.item()
-
-                self.heldout_x = torch.cat(
-                    [self.heldout_x[:index], self.heldout_x[index + 1 :]]
-                )
-                self.heldout_y = torch.cat(
-                    [self.heldout_y[:index], self.heldout_y[index + 1 :]]
-                )
+            eq_mask = torch.eq(self.heldout_x.unsqueeze(0), x.unsqueeze(1)).all(dim=-1)
+            # Finding indices to delete
+            indices_to_delete = torch.any(eq_mask, dim=0).nonzero(as_tuple=True)[0]
+            if indices_to_delete.numel() > 0:
+                self.heldout_x = torch_delete_rows(self.heldout_x, indices_to_delete)
+                self.heldout_y = torch_delete_rows(self.heldout_y, indices_to_delete)
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -151,7 +150,6 @@ class BotorchOptimizer:
             self.surrogate_model.fit(self.train_x, self.train_y)
 
             additional_acq_function_params = self.update_acquisition_function_params()
-
             self.acq_function = instantiate_class(
                 self.acq_function_config, **additional_acq_function_params
             )
@@ -169,7 +167,7 @@ class BotorchOptimizer:
         if self.heldout_x is not None:
             # Convert heldout set to the appropriate tensor format
             X = self.heldout_x.unsqueeze(1)
-
+            self.surrogate_model.eval()
             # Get the acquisition function values at these points
             acq_values = acq_function(X).squeeze()
 

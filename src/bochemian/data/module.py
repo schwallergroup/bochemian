@@ -17,6 +17,8 @@ from bochemian.initialization.initializers import BOInitializer
 from bochemian.data.utils import find_duplicates, find_nan_rows
 
 from abc import ABC
+import os
+os.environ["OMP_NUM_THREADS"] = "28"
 
 
 class Featurizer:
