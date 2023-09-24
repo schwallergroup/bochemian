@@ -1,10 +1,7 @@
 import pytorch_lightning as pl
 import pandas as pd
-import numpy as np
 import torch
-from typing import Dict, Optional
-from bochemian.data.embedder import DataFeaturizer
-from itertools import chain
+from typing import Optional
 from typing import Optional, Union, List
 
 from pytorch_lightning.utilities.types import EVAL_DATALOADERS, TRAIN_DATALOADERS
@@ -18,6 +15,7 @@ from bochemian.data.utils import find_duplicates, find_nan_rows
 
 from abc import ABC
 import os
+
 os.environ["OMP_NUM_THREADS"] = "28"
 
 
@@ -196,73 +194,3 @@ class BaseDataModule(pl.LightningDataModule, ABC):
     def transfer_batch_to_device(self, batch, device, dataloader_idx):
         batch = [item.to(device) for item in batch]
         return batch
-
-
-class DataModule(pl.LightningDataModule):
-    def __init__(
-        self,
-        reaction_components: Optional[Dict[str, list]] = None,
-        design_space_file_path: Optional[
-            str
-        ] = "/home/rankovic/projects/additive-bo/data/additives/additive_screening_plate_1.csv",
-        data_featurizer: DataFeaturizer = DataFeaturizer("drfp"),
-        task: str = "reaction_optimization",
-        *args,
-        **kwargs,
-    ):
-        super().__init__(*args, **kwargs)
-        self.reaction_components = reaction_components
-        self.design_space_file_path = design_space_file_path
-        self.data_featurizer = data_featurizer
-        self.task = task
-
-        if (
-            self.reaction_components is not None
-            and self.design_space_file_path is not None
-        ):
-            raise ValueError(
-                "Provide either reaction_components or design_space_file_path, not both."
-            )
-
-    def setup(self, stage: Optional[str] = None):
-        if self.reaction_components:
-            self._create_design_space_from_reaction_components()
-        elif self.design_space_file_path:
-            self._load_design_space_from_file()
-
-        input_features = self.featurize_data(self.design_space)
-        input_features = torch.from_numpy(input_features).to(torch.float64)
-
-        self.design_space["x"] = [row for row in input_features]
-
-    def _create_design_space_from_reaction_components(self):
-        import itertools
-
-        combinations = list(itertools.product(*self.reaction_components.values()))
-        design_space = pd.DataFrame(
-            combinations, columns=self.reaction_components.keys()
-        )
-        design_space["objective"] = np.nan
-        self.design_space = design_space
-
-    def _load_design_space_from_file(self):
-        self.design_space = pd.read_csv(self.design_space_file_path)
-        output_labels = torch.from_numpy(
-            self.design_space["objective"].values.reshape(-1, 1)
-        ).to(torch.float64)
-        self.design_space["objective"] = [row for row in output_labels]
-
-    def featurize_data(self, design_space):
-        self.data_featurizer.set_features(self.task, design_space)
-        self.data_featurizer.featurize()
-        return self.data_featurizer.features
-
-
-df = DataFeaturizer("fragprints")
-dm = DataModule(
-    task="molecular_optimization",
-    design_space_file_path="/home/rankovic/projects/additive-bo/data/additives/additive_screening_plate_4.csv",
-    data_featurizer=df,
-)
-dm.setup()
-# print(dm.design_space.head())
