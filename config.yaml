@@ -1,7 +1,7 @@
 data:
   class_path: bochemian.data.module.BaseDataModule
   init_args:
-    data_path: data/processed/bh_reaction_1_procedure_template_basic.csv
+    data_path: data/processed/bh_reaction_1_procedure_template_full.csv
     input_column: ada_embeddings
     target_column: yield
     featurizer:
@@ -9,64 +9,62 @@ data:
       init_args:
         task: reaction_optimization
         representation: precalculated
-        bond_radius: 7
-        nBits: 512
     initializer:
       class_path: bochemian.initialization.initializers.BOInitializer
       init_args:
         method: kmeans
         metric: jaccard
         n_clusters: 10
-        init: random
-        use_pca: 10
+        init: k-means++
+        use_pca: null
         seed: null
 bo:
   class_path: bochemian.bo.optimizer.BotorchOptimizer
   init_args:
     batch_strategy: 'kriging'
     batch_size: 5
-    acq_function_config:
-      class_path: "botorch.acquisition.UpperConfidenceBound"
-      init_args: 
-        beta: 2 
-        maximize: True
-    surrogate_model_config:
-      class_path: bochemian.surrogate_models.gp.SimpleGP
+acquisition:
+  class_path: "botorch.acquisition.UpperConfidenceBound"
+  init_args: 
+    maximize: True
+    beta: 2
+surrogate_model:
+  class_path: bochemian.surrogate_models.gp.SimpleGP
+  init_args:
+    likelihood:
+      class_path: gpytorch.likelihoods.GaussianLikelihood
       init_args:
-        likelihood:
-          class_path: gpytorch.likelihoods.GaussianLikelihood
+        noise_prior: null
+        noise_constraint: null
+        batch_shape:
+          class_path: torch.Size
+    covar_module:
+      class_path: gpytorch.kernels.ScaleKernel
+      init_args:
+        base_kernel:
+          class_path: gpytorch.kernels.MaternKernel
           init_args:
-            noise_prior: null
-            noise_constraint: null
-            batch_shape:
-              class_path: torch.Size
-        covar_module:
-          class_path: gpytorch.kernels.ScaleKernel
-          init_args:
-            base_kernel:
-              class_path: gpytorch.kernels.MaternKernel
-              init_args:
-                nu: 2.5
-                ard_num_dims: null
-                batch_shape: null
-                active_dims: null
-                lengthscale_prior: null
-                lengthscale_constraint: null
-                eps: 1.0e-06
-            outputscale_prior: null
-            outputscale_constraint: null
+            nu: 2.5
             ard_num_dims: null
             batch_shape: null
             active_dims: null
             lengthscale_prior: null
             lengthscale_constraint: null
             eps: 1.0e-06
-        mean_module: null
-        standardize: true
-        normalize: false
-        initial_noise_val: 1.0e-4
-        noise_constraint: 1.0e-05
-        initial_outputscale_val: 2.0
-        initial_lengthscale_val: 0.5
+        outputscale_prior: null
+        outputscale_constraint: null
+        ard_num_dims: null
+        batch_shape: null
+        active_dims: null
+        lengthscale_prior: null
+        lengthscale_constraint: null
+        eps: 1.0e-06
+    mean_module: null
+    standardize: true
+    normalize: false
+    initial_noise_val: 1.0
+    noise_constraint: 1.0e-05
+    initial_outputscale_val: 2.0
+    initial_lengthscale_val: 0.5
 n_iters: 20
 seed: 1
