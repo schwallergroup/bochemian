@@ -223,6 +223,9 @@ def train(config):
 
         # Using the indices found, directly index into self.heldout_y to get y_next
         y_next = bo.heldout_y[indices]
+        wandb.log(
+            {"evaluated_suggestions": wandb.Histogram(y_next.numpy()), "epoch": i}
+        )
 
         # Ensure that y_next and x_next have the correct shape
         x_next = x_next.squeeze(1)

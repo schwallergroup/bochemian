@@ -126,9 +126,13 @@ class BotorchOptimizer:
         self.train_y = torch.cat([self.train_y, y]) if self.train_y is not None else y
 
         if len(self.pending_x) > 0 and not lie:
-            points_set = {tuple(point.numpy()) for point in x}
+            pending_x_stack = torch.stack(self.pending_x)
+            eq_mask = (pending_x_stack.unsqueeze(0) == x.unsqueeze(1)).all(dim=-1)
+            indices_to_keep = ~torch.any(eq_mask, dim=0)
             self.pending_x = [
-                p for p in self.pending_x if tuple(p.numpy()) not in points_set
+                self.pending_x[i]
+                for i in range(len(self.pending_x))
+                if indices_to_keep[i]
             ]
 
         # would have to be changed because the experiment might not be exactly the same
