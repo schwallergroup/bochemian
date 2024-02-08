@@ -17,9 +17,11 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 from bochemian.gprotorch.data_featuriser.featurisation import (
     ada_embeddings,
     gte_embeddings,
-    bge_embeddings,
+    # bge_embeddings,
     instructor_embeddings,
     e5_embeddings,
+    # e5_mistral_embeddings,
+    ada_embeddings_3,
 )
 
 
@@ -66,7 +68,7 @@ data = pd.read_csv(args.data_path)
 # Get unique SMILES strings
 unique_smiles = set()
 for component in config["components"]:
-    unique_smiles.update(data[component].tolist())
+    unique_smiles = data[component].unique().tolist()
 
 
 # Get details for all unique SMILES strings
@@ -101,18 +103,15 @@ with ProcessPoolExecutor() as executor:
 
 
 embedding_functions = [
-    ada_embeddings,
-    bge_embeddings,
-    gte_embeddings,
-    instructor_embeddings,
-    e5_embeddings,
+    # ada_embeddings,
+    # bge_embeddings,
+    ada_embeddings_3,
+    # e5_mistral_embeddings,
+    # gte_embeddings,
+    # instructor_embeddings,
+    # e5_embeddings,
 ]
 
-# Apply each embedding function dynamically
-for embed_func in embedding_functions:
-    column_name = embed_func.__name__
-    embeddings = embed_func(data["procedure"].tolist())
-    data[column_name] = embeddings.tolist()
 
 # Extract the config name from the config path
 config_name = os.path.basename(args.config_path).replace(".yaml", "")
@@ -120,11 +119,55 @@ config_name = os.path.basename(args.config_path).replace(".yaml", "")
 # Extract the dataset name from the data path
 data_name = os.path.basename(args.data_path).split(".")[0]
 
-# Create the output file name using the config and dataset names, and the timestamp
-output_file_name = f"{data_name}_procedure_template_{config_name}.csv"
+# Construct the expected output file name based on the dataset and config names
+expected_output_file_name = f"{data_name}_procedure_template_{config_name}.csv"
 
-# Create the full output path using the output directory and the output file name
-output_path = os.path.join("../data/processed", output_file_name)
+# Construct the full expected output path
+expected_output_path = os.path.join("../data/processed", expected_output_file_name)
 
-# Save the new CSV file with the procedure texts
-data.to_csv(output_path, index=False)
+# Check if the expected output file already exists
+if os.path.exists(expected_output_path):
+    # Read the existing data
+    data = pd.read_csv(expected_output_path)
+
+# Apply each embedding function dynamically
+for embed_func in embedding_functions:
+    column_name = embed_func.__name__
+
+    # Check if the embeddings column already exists
+    if column_name not in data.columns:
+        print(f"Generating embeddings for {column_name}")
+        # Generate embeddings only for the new procedures
+        # new_procedures = data.loc[
+        #     ~data["procedure"].isin(data[column_name]), "procedure"
+        # ].tolist()
+        embeddings = embed_func(data["procedure"].tolist())
+        data[column_name] = embeddings.tolist()
+
+        # # Append the new embeddings to the dataframe
+        # data.loc[~data["procedure"].isin(data[column_name]), column_name] = embeddings
+    else:
+        print(f"Embeddings for {column_name} already exist. Skipping...")
+    data.to_csv(expected_output_path, index=False)
+
+# Save the data with new embeddings to the expected output path
+# data.to_csv(expected_output_path, index=False)
+
+# embeddings = embed_func(data["procedure"].tolist())
+# data[column_name] = embeddings.tolist()
+
+# Extract the config name from the config path
+# config_name = os.path.basename(args.config_path).replace(".yaml", "")
+
+# # Extract the dataset name from the data path
+# data_name = os.path.basename(args.data_path).split(".")[0]
+
+
+# # Create the output file name using the config and dataset names, and the timestamp
+# output_file_name = f"{data_name}_procedure_template_{config_name}.csv"
+
+# # Create the full output path using the output directory and the output file name
+# output_path = os.path.join("../data/processed", output_file_name)
+
+# # Save the new CSV file with the procedure texts
+# data.to_csv(output_path, index=False)

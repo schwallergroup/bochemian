@@ -46,12 +46,18 @@ class MaxMinInitializer(Initializer):
 
 
 class RandomInitializer(Initializer):
-    def __init__(self, n_clusters=20, **kwargs):
+    def __init__(self, n_clusters=20, seed=0, **kwargs):
         self.n_clusters = n_clusters
+        self.seed = seed
 
     def fit(self, x, exclude=None):
         x_init = torch_delete_rows(x, exclude)
-        return torch.randperm(len(x_init))[: self.n_clusters].tolist(), {}
+        return (
+            np.random.default_rng(seed=self.seed)
+            .permutation(len(x_init))[: self.n_clusters]
+            .tolist(),
+            {},
+        )
 
 
 class KMeansInitializer(Initializer):
@@ -186,7 +192,6 @@ class BOInitializer:
     def fit(self, x, exclude: list = None):
         x_init = torch_delete_rows(x, exclude)
         selected_reactions, clusters = self.initializer.fit(x, exclude)
-        print(selected_reactions, "selected reactions")
         self.selected_reactions = [
             get_original_index(x_init.numpy()[i], x) for i in selected_reactions
         ]

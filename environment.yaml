@@ -30,3 +30,4 @@ dependencies:
     - openai
     - InstructorEmbedding
     - sentence-transformers
+    - pubchempy

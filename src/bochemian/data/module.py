@@ -50,6 +50,9 @@ class Featurizer:
         return self.loader.features
 
 
+import numpy as np
+
+
 class BaseDataModule(pl.LightningDataModule, ABC):
     def __init__(
         self,
@@ -75,6 +78,7 @@ class BaseDataModule(pl.LightningDataModule, ABC):
 
     def load_data(self):
         self.data = pd.read_csv(self.data_path)
+        self.original_indices = np.arange(len(self.data))
 
     def featurize_data(self):
         x = self.featurizer.featurize(self.data[self.input_column])
@@ -97,6 +101,8 @@ class BaseDataModule(pl.LightningDataModule, ABC):
 
         print(f"Selected reactions: {init_indexes}")
         self.train_indexes = init_indexes
+        self.heldout_indices = torch.from_numpy(np.delete(self.original_indices, init_indexes))
+
         self.train_x = self.x[init_indexes]
         self.heldout_x = torch_delete_rows(self.x, init_indexes)
 

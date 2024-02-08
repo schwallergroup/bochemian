@@ -42,19 +42,34 @@ def get_component_details(smiles):
 
 # Generate procedures for each reaction
 def generate_procedure(row, components, details, procedure_template, smiles_details):
-    component_details_text = []
+    # component_details_text = []
+    component_details_dict = {}
     for component in components:
-        component_details = smiles_details[row[component]]
-        component_text = [f"- {component.capitalize()}: {row[component]}"]
-        if details is None:
-            details = []
-        for detail in details:
-            component_text.append(
-                f"  - {detail.replace('_', ' ').capitalize()}: {component_details[detail]}"
-            )
-        component_details_text.append("\n".join(component_text))
-    procedure = procedure_template.format(
-        component_details="\n".join(component_details_text)
-    )
-    return procedure
+        smiles = row[component]
+        component_details = smiles_details.get(smiles, {})
+        if details:
+            detail_list = [
+                f"{detail.capitalize()}: {component_details.get(detail, 'Not available')}"
+                for detail in details
+            ]
+            component_detail_str = f"{smiles}\n  " + "\n  ".join(detail_list)
+        else:
+            component_detail_str = smiles
+        component_details_dict[f"{component}_details"] = component_detail_str
+    procedure = procedure_template.format(**component_details_dict)
+    #     component_details = smiles_details[row[component]]
+    #     component_text = [f"- {component.capitalize()}: {row[component]}"]
+    #     if details is None:
+    #         details = []
+    #     for detail in details:
+    #         component_text.append(
+    #             f"  - {detail.replace('_', ' ').capitalize()}: {component_details[detail]}"
+    #         )
+    #     component_details_text.append("\n".join(component_text))
+    # procedure = procedure_template.format(
+    # component_details="\n".join(component_details_text)
+    # )
+    # print(component_details_text)
+    # procedure = procedure_template.format(**component_details)
 
+    return procedure

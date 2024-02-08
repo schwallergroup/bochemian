@@ -1,8 +1,8 @@
 data:
   class_path: bochemian.data.module.BaseDataModule
   init_args:
-    data_path: data/processed/bh_reaction_1_procedure_template_full.csv
-    input_column: ada_embeddings
+    data_path: data/processed/bh_reaction_1_procedure_template_basic.csv
+    input_column: ada_embeddings_3_256
     target_column: yield
     featurizer:
       class_path: bochemian.data.module.Featurizer
@@ -23,11 +23,16 @@ bo:
   init_args:
     batch_strategy: 'kriging'
     batch_size: 5
+    finetuning: true
+    emb_criterion: contrastive
+    threshold: 0.1
+    margin: 0.2
+    concat: true
 acquisition:
-  class_path: "botorch.acquisition.UpperConfidenceBound"
+  class_path: botorch.acquisition.ExpectedImprovement #bochemian.acquisition.function.EmbeddingInformedExpectedImprovement #botorch.acquisition.ExpectedImprovement #CustomExpectedImprovement #"botorch.acquisition.ExpectedImprovement" #   #
   init_args: 
     maximize: True
-    beta: 2
+    # beta: 2
 surrogate_model:
   class_path: bochemian.surrogate_models.gp.SimpleGP
   init_args:
@@ -61,10 +66,10 @@ surrogate_model:
         eps: 1.0e-06
     mean_module: null
     standardize: true
-    normalize: false
+    normalize: true
     initial_noise_val: 1.0
-    noise_constraint: 1.0e-05
-    initial_outputscale_val: 2.0
+    noise_constraint: 1.0e-04
+    initial_outputscale_val: 1.0
     initial_lengthscale_val: 0.5
 n_iters: 20
 seed: 1

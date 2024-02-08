@@ -8,6 +8,7 @@ from bochemian.gprotorch.data_featuriser import (
     rxnfp,
     rxnfp2,
     precalculated,
+    ada_embeddings,
 )
 from bochemian.gprotorch.dataloader import DataLoader
 from ast import literal_eval
@@ -57,6 +58,7 @@ class ReactionLoader(DataLoader):
             "bag_of_smiles",
             "gpt2",
             "precalculated",
+            "ada_embeddings",
         ]
 
         if representation == "ohe":
@@ -86,6 +88,9 @@ class ReactionLoader(DataLoader):
         elif representation == "precalculated":
             self.features = self.features.apply(literal_eval)
             self.features = self.features.apply(pd.Series).values
+
+        elif representation == "ada_embeddings":
+            self.features = ada_embeddings(self.features.to_list())
 
         else:
             raise Exception(

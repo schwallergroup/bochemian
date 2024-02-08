@@ -16,6 +16,8 @@ from .featurisation import (
     rxnfp2,
     xtb,
     precalculated,
+    ada_embeddings,
+    e5_mistral_embeddings,
 )
 
 __all__ = [

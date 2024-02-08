@@ -72,13 +72,13 @@ class SimpleGP(SurrogateModel, SingleTaskGP):
         initial_lengthscale_val: float = 0.5,
     ) -> None:
         super().__init__(
-            train_x,
-            train_y,
-            likelihood,
-            covar_module,
-            mean_module,
-            Standardize(train_y.shape[-1]) if standardize else None,
-            Normalize(train_x.shape[-1]) if normalize else None,
+            train_X=train_x,
+            train_Y=train_y,
+            likelihood=likelihood,
+            covar_module=covar_module,
+            mean_module=mean_module,
+            outcome_transform=Standardize(train_y.shape[-1]) if standardize else None,
+            input_transform=Normalize(train_x.shape[-1]) if normalize else None,
         )
 
         self.likelihood.noise_covar.register_constraint(
