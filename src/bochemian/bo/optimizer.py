@@ -59,6 +59,7 @@ class BotorchOptimizer:
             self.emb_criterion = LogRatioLossTorch()
         elif emb_criterion == "triplet":
             self.emb_criterion = TripletLossTorch(threshold=threshold, margin=margin)
+        else: self.emb_criterion = None
         self.design_space = design_space
         self.surrogate_model_config = (
             surrogate_model_config or BotorchOptimizer.default_surrogate_model_config()

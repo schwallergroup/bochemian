@@ -57,7 +57,9 @@ def train_finetuning_model(
             mse_loss = mse_criterion(
                 outputs / norm_factor, targets / norm_factor
             ) / len(inputs)
-            logratio_loss = emb_criterion(embeddings, targets / norm_factor)
+            logratio_loss = (
+                emb_criterion(embeddings, targets / norm_factor) if emb_criterion else 0
+            )
 
             # Weight the loss by function evaluations (yields)
             # weights = 5 * weight_func(targets)
