@@ -520,29 +520,32 @@ def instructor_embeddings(
     :return: NumPy array of Instructor embeddings
     """
     # Load the INSTRUCTOR model
-    model = INSTRUCTOR(model_name)
+    model = INSTRUCTOR(model_name).to(
+        "cuda" if torch.cuda.is_available() else "cpu"
+    )
 
-    # batch_size = 32
-    # sentence_embeddings_list = []
-    # for i in tqdm(range(0, len(texts), batch_size)):
-    #     batch_texts = texts[i : i + batch_size]
-    #     batch_embeddings = model.encode([[instruction, text] for text in batch_texts])
+    batch_size = 32
+    sentence_embeddings_list = []
+    paired_texts = [[instruction, text] for text in texts]
+    
+    for i in tqdm(range(0, len(paired_texts), batch_size)):
+        # batch_embeddings = model.encode([[instruction, text] for text in batch_texts])
+        batch_embeddings = model.encode(paired_texts[i: i + batch_size])
+        sentence_embeddings_list.append(batch_embeddings)
 
-    #     sentence_embeddings_list.append(batch_embeddings)
+        # Clear temporary variables to free up memory
+        # del encoded_input, outputs, sentence_embeddings
+        # gc.collect()
 
-    #     # Clear temporary variables to free up memory
-    #     del encoded_input, outputs, sentence_embeddings
-    #     gc.collect()
+    return np.concatenate(sentence_embeddings_list, axis=0)
 
-    # return np.concatenate(sentence_embeddings_list, axis=0)
+    # # Encode the texts with the given instruction
+    # embeddings = model.encode([[instruction, text] for text in texts])
 
-    # Encode the texts with the given instruction
-    embeddings = model.encode([[instruction, text] for text in texts])
+    # # Convert embeddings to NumPy array
+    # embeddings_np = np.array(embeddings)
 
-    # Convert embeddings to NumPy array
-    embeddings_np = np.array(embeddings)
-
-    return embeddings_np
+    # return embeddings_np
 
 
 def one_hot(df):

@@ -2,7 +2,7 @@ data:
   class_path: bochemian.data.module.BaseDataModule
   init_args:
     data_path: data/processed/bh_reaction_1_procedure_template_basic.csv
-    input_column: ada_embeddings_3_256
+    input_column: instructor_embeddings
     target_column: yield
     featurizer:
       class_path: bochemian.data.module.Featurizer
@@ -24,7 +24,7 @@ bo:
     batch_strategy: 'kriging'
     batch_size: 5
     finetuning: true
-    emb_criterion: contrastive
+    emb_criterion: logratio
     threshold: 0.1
     margin: 0.2
     concat: true

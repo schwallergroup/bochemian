@@ -344,7 +344,7 @@ from scipy.spatial.distance import pdist, squareform
 
 
 def calculate_distances(
-    embeddings, scores, high_score_threshold=70, low_score_threshold=20
+    embeddings, scores, high_score_threshold=70, low_score_threshold=10
 ):
     """
     Plots histograms of L2 distances between points in latent space.
