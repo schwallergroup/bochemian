@@ -38,6 +38,39 @@ def precalculated(features):
     return features.apply(pd.Series).values
 
 
+def average_pool(last_hidden_states, attention_mask):
+    last_hidden = last_hidden_states.masked_fill(
+        ~attention_mask[..., None].bool(), 0.0
+    )
+    return last_hidden.sum(dim=1) / attention_mask.sum(dim=1)[..., None]
+
+
+def last_token_pool(last_hidden_states, attention_mask):
+    sequence_lengths = attention_mask.sum(dim=1) - 1
+    return last_hidden_states[
+        torch.arange(last_hidden_states.size(0)), sequence_lengths
+    ]
+
+
+def weighted_average_pool(last_hidden_states, attention_mask):
+    seq_length = last_hidden_states.size(1)
+    weights = (
+        torch.arange(1, seq_length + 1, dtype=torch.float32)
+        .unsqueeze(0)
+        .to(last_hidden_states.device)
+    )
+
+    weighted_mask = weights * attention_mask.float()
+    weighted_hidden_states = last_hidden_states * weighted_mask.unsqueeze(-1)
+
+    sum_weighted_embeddings = torch.sum(weighted_hidden_states, dim=1)
+    sum_weights = torch.sum(weighted_mask, dim=1, keepdim=True).clamp(min=1)
+
+    weighted_average_embeddings = sum_weighted_embeddings / sum_weights
+
+    return weighted_average_embeddings
+
+
 # @lru_cache(maxsize=None)
 # def get_embedding(text, model="text-embedding-ada-002"):
 #     text = text.replace("\n", " ")
@@ -98,28 +131,39 @@ def get_huggingface_embeddings(
     pooling_method="average",
     prefix=None,
     device="cuda" if torch.cuda.is_available() else "cpu",
+    normalize_embeddings=False,
 ):
     """
     General function to get embeddings from a HuggingFace transformer model.
     """
 
-    def average_pool(last_hidden_states, attention_mask):
-        return last_hidden_states.sum(dim=1) / attention_mask.sum(
-            dim=1, keepdim=True
-        )
-
-    def last_token_pool(last_hidden_states, attention_mask):
-        sequence_lengths = attention_mask.sum(dim=1) - 1
-        return last_hidden_states[
-            torch.arange(last_hidden_states.size(0)), sequence_lengths
-        ]
-
     # Load model and tokenizer from HuggingFace Hub
     tokenizer = AutoTokenizer.from_pretrained(model_name)
-    model = AutoModel.from_pretrained(model_name).to(device)
+
+    if model_name == "GT4SD/multitask-text-and-chemistry-t5-base-augm":
+        config = T5Config.from_pretrained(model_name)
+        config.dropout_rate = 0
+        model = T5EncoderModel.from_pretrained(model_name, config=config).to(
+            device
+        )
+    elif model_name in [
+        "llama-2-7b-hf",
+        "llama-2-13b-hf",
+        "llama-2-70b-hf",
+        "meta-llama/Meta-Llama-3-8B",
+    ]:
+        config = LlamaConfig.from_pretrained(model_name)
+        config.attn_dropout = 0
+        model = LlamaModel.from_pretrained(model_name, config=config).to(
+            device
+        )
+        tokenizer.pad_token = tokenizer.eos_token
+    else:
+        model = AutoModel.from_pretrained(model_name).to(device)
     print(model.device)
 
     model.eval()
+    torch.set_grad_enabled(False)
 
     # Optionally add prefix to each text
     if prefix:
@@ -150,12 +194,17 @@ def get_huggingface_embeddings(
                 pooled = last_hidden_state[:, 0]
             elif pooling_method == "last_token_pool":
                 pooled = last_token_pool(last_hidden_state, attention_mask)
+            elif pooling_method == "weighted_average":
+                pooled = weighted_average_pool(
+                    last_hidden_state, attention_mask
+                )
             else:
                 raise ValueError(f"Unknown pooling method: {pooling_method}")
+            if normalize_embeddings:
+                pooled = F.normalize(pooled, p=2, dim=1)
+            embeddings_list.append(pooled.cpu().numpy()) 
 
-            pooled = F.normalize(pooled, p=2, dim=1)
-            embeddings_np = pooled.cpu().numpy()
-            embeddings_list.append(embeddings_np)
+        del encoded_input, outputs, pooled
         torch.cuda.empty_cache()
 
     return np.concatenate(embeddings_list, axis=0)
@@ -341,12 +390,19 @@ def bge_embeddings(texts, model_name="BAAI/bge-large-zh-v1.5"):
     :return: NumPy array of BGE embeddings
     """
     return get_huggingface_embeddings(
-        texts, model_name, max_length=512, batch_size=32, pooling_method="cls"
+        texts,
+        model_name,
+        max_length=512,
+        batch_size=32,
+        pooling_method="average",
     )
 
 
 def e5_mistral_embeddings(
-    texts, model_name="intfloat/e5-mistral-7b-instruct", max_length=4096
+    texts,
+    model_name="intfloat/e5-mistral-7b-instruct",
+    max_length=512,
+    batch_size=32,
 ):
     """
     Get E5 Mistral embeddings for a list of texts using the last token pooling method.
@@ -355,9 +411,9 @@ def e5_mistral_embeddings(
         texts,
         model_name,
         max_length=max_length,
-        batch_size=1,
-        pooling_method="last_token_pool",
-        device="cpu",
+        batch_size=batch_size,
+        pooling_method="average",
+        device="cuda",
     )
 
 
@@ -385,7 +441,7 @@ def gte_embeddings(texts, model_name="thenlper/gte-large"):
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     model = AutoModel.from_pretrained(model_name)
     model.eval()
-    batch_size = 32
+    batch_size = 8
     sentence_embeddings_list = []
     for i in tqdm(range(0, len(texts), batch_size)):
         batch_texts = texts[i : i + batch_size]
@@ -507,6 +563,7 @@ def instructor_embeddings(
     texts,
     model_name="hkunlp/instructor-xl",
     instruction="Represent the chemistry procedure: ",
+    normalize=False,
 ):
     """
     Get Instructor embeddings for a list of texts.
@@ -520,29 +577,258 @@ def instructor_embeddings(
     :return: NumPy array of Instructor embeddings
     """
     # Load the INSTRUCTOR model
-    model = INSTRUCTOR(model_name)
+    model = INSTRUCTOR(model_name).to(
+        "cuda" if torch.cuda.is_available() else "cpu"
+    )
 
-    # batch_size = 32
-    # sentence_embeddings_list = []
-    # for i in tqdm(range(0, len(texts), batch_size)):
-    #     batch_texts = texts[i : i + batch_size]
-    #     batch_embeddings = model.encode([[instruction, text] for text in batch_texts])
+    batch_size = 32
+    sentence_embeddings_list = []
+    paired_texts = [[instruction, text] for text in texts]
 
-    #     sentence_embeddings_list.append(batch_embeddings)
+    for i in tqdm(range(0, len(paired_texts), batch_size)):
+        # batch_embeddings = model.encode([[instruction, text] for text in batch_texts])
+        batch_embeddings = model.encode(
+            paired_texts[i : i + batch_size], normalize_embeddings=normalize
+        )
+        sentence_embeddings_list.append(batch_embeddings)
 
-    #     # Clear temporary variables to free up memory
-    #     del encoded_input, outputs, sentence_embeddings
-    #     gc.collect()
+        # Clear temporary variables to free up memory
+        # del encoded_input, outputs, sentence_embeddings
+        # gc.collect()
 
-    # return np.concatenate(sentence_embeddings_list, axis=0)
+    return np.concatenate(sentence_embeddings_list, axis=0)
 
-    # Encode the texts with the given instruction
-    embeddings = model.encode([[instruction, text] for text in texts])
+    # # Encode the texts with the given instruction
+    # embeddings = model.encode([[instruction, text] for text in texts])
 
-    # Convert embeddings to NumPy array
-    embeddings_np = np.array(embeddings)
+    # # Convert embeddings to NumPy array
+    # embeddings_np = np.array(embeddings)
 
-    return embeddings_np
+    # return embeddings_np
+
+
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers import T5EncoderModel, T5Config
+
+
+def t5chem_embeddings(
+    texts,
+    model_name="GT4SD/multitask-text-and-chemistry-t5-base-augm",
+    normalize=False,
+):
+    # Load model directly
+
+    def average_pool(last_hidden_states, attention_mask, normalize=normalize):
+        last_hidden = last_hidden_states.masked_fill(
+            ~attention_mask[..., None].bool(), 0.0
+        )
+        return last_hidden.sum(dim=1) / attention_mask.sum(dim=1)[..., None]
+
+    config = T5Config.from_pretrained(
+        "GT4SD/multitask-text-and-chemistry-t5-base-augm"
+    )
+    config.dropout_rate = 0
+    feature_extractor = T5EncoderModel.from_pretrained(
+        "GT4SD/multitask-text-and-chemistry-t5-base-augm", config=config
+    )
+
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+    model.eval()
+    batch_size = 32
+    sentence_embeddings_list = []
+    for i in tqdm(range(0, len(texts), batch_size)):
+        batch_texts = texts[i : i + batch_size]
+        encoded_input = tokenizer(
+            batch_texts,
+            max_length=512,
+            padding=True,
+            truncation=True,
+            return_tensors="pt",
+        )
+        with torch.no_grad():
+            outputs = feature_extractor(**encoded_input)
+            sentence_embeddings = average_pool(
+                outputs.last_hidden_state, encoded_input["attention_mask"]
+            )
+        sentence_embeddings_np = sentence_embeddings.numpy()
+        sentence_embeddings_list.append(sentence_embeddings_np)
+
+        # Clear temporary variables to free up memory
+        del encoded_input, outputs, sentence_embeddings
+        gc.collect()
+
+    return np.concatenate(sentence_embeddings_list, axis=0)
+
+
+def t5chem_embeddings_weighted(
+    texts, model_name="GT4SD/multitask-text-and-chemistry-t5-base-augm"
+):
+    # Load model directly
+    config = T5Config.from_pretrained(
+        "GT4SD/multitask-text-and-chemistry-t5-base-augm"
+    )
+    config.dropout_rate = 0
+    feature_extractor = T5EncoderModel.from_pretrained(
+        "GT4SD/multitask-text-and-chemistry-t5-base-augm", config=config
+    )
+
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+    model.eval()
+    batch_size = 32
+    sentence_embeddings_list = []
+    for i in tqdm(range(0, len(texts), batch_size)):
+        batch_texts = texts[i : i + batch_size]
+        encoded_input = tokenizer(
+            batch_texts,
+            max_length=512,
+            padding=True,
+            truncation=True,
+            return_tensors="pt",
+        )
+        with torch.no_grad():
+            outputs = feature_extractor(**encoded_input)
+            sentence_embeddings = weighted_average_pool(
+                outputs.last_hidden_state, encoded_input["attention_mask"]
+            )
+        sentence_embeddings_np = sentence_embeddings.numpy()
+        sentence_embeddings_list.append(sentence_embeddings_np)
+
+        # Clear temporary variables to free up memory
+        del encoded_input, outputs, sentence_embeddings
+        gc.collect()
+
+    return np.concatenate(sentence_embeddings_list, axis=0)
+
+
+from transformers import LlamaModel, LlamaConfig
+
+
+import torch
+
+
+def weighted_average_pool(last_hidden_states, attention_mask):
+    seq_length = last_hidden_states.size(1)
+    weights = (
+        torch.arange(1, seq_length + 1, dtype=torch.float32)
+        .unsqueeze(0)
+        .to(last_hidden_states.device)
+    )
+
+    weighted_mask = weights * attention_mask.float()
+    weighted_hidden_states = last_hidden_states * weighted_mask.unsqueeze(-1)
+
+    sum_weighted_embeddings = torch.sum(weighted_hidden_states, dim=1)
+    sum_weights = torch.sum(weighted_mask, dim=1, keepdim=True).clamp(min=1)
+
+    weighted_average_embeddings = sum_weighted_embeddings / sum_weights
+
+    return weighted_average_embeddings
+
+
+import torch
+
+import voyageai
+
+
+def voyageai_embeddings(texts):
+
+    vo = voyageai.Client()
+    result = vo.embed(texts, model="voyage-large-2-instruct")
+    return np.array(result)
+
+
+def extract_last_token_embeddings(model, tokenizer, texts, normalize=False):
+    """
+    Extracts the embeddings of the last non-padding token from the last hidden layer of a model.
+
+    :param model: The language model from which to extract embeddings.
+    :param tokenizer: The tokenizer corresponding to the model.
+    :param texts: A list of strings for which to extract embeddings.
+    :param normalize: If True, normalizes the embeddings to unit norm.
+    :return: A tensor of embeddings.
+    """
+    model.eval()
+    inputs = tokenizer(texts, padding=True, return_tensors="pt")
+    inputs = {
+        key: val.to(next(model.parameters()).device)
+        for key, val in inputs.items()
+    }
+    with torch.no_grad():
+        last_hidden_state = model(
+            **inputs, output_hidden_states=True
+        ).hidden_states[-1]
+    idx_of_the_last_non_padding_token = (
+        inputs["attention_mask"].bool().sum(1) - 1
+    )
+
+    sentence_embeddings = last_hidden_state[
+        torch.arange(last_hidden_state.shape[0]),
+        idx_of_the_last_non_padding_token,
+    ]
+
+    if normalize:
+        sentence_embeddings = torch.nn.functional.normalize(
+            sentence_embeddings, p=2, dim=1
+        )
+
+    return sentence_embeddings
+
+
+def llama(texts, model_name="Meta-Llama-3-8B", type="prompt-last-token"):
+    assert model_name in [
+        "llama-2-7b-hf",
+        "llama-2-13b-hf",
+        "llama-2-70b-hf",
+        "Meta-Llama-3-8B",
+    ]
+
+    def average_pool(last_hidden_states, attention_mask):
+        last_hidden = last_hidden_states.masked_fill(
+            ~attention_mask[..., None].bool(), 0.0
+        )
+        return last_hidden.sum(dim=1) / attention_mask.sum(dim=1)[..., None]
+
+    kind = f"meta-llama/{model_name.capitalize()}"  # -hf"
+    config = LlamaConfig.from_pretrained(kind)
+    config.attn_dropout = 0
+    model = LlamaModel.from_pretrained(kind, config=config)
+    tokenizer = AutoTokenizer.from_pretrained(kind)
+    tokenizer.pad_token = tokenizer.eos_token
+
+    # model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+    model.eval()
+    batch_size = 16
+    sentence_embeddings_list = []
+    for i in tqdm(range(0, len(texts), batch_size)):
+        batch_texts = texts[i : i + batch_size]
+        if type == "prompt-last-token":
+            sentence_embeddings = extract_last_token_embeddings(
+                model, tokenizer, batch_texts
+            )
+        else:
+            encoded_input = tokenizer(
+                batch_texts,
+                max_length=512,
+                padding=True,
+                truncation=True,
+                return_tensors="pt",
+            )
+            with torch.no_grad():
+                outputs = model(**encoded_input)
+                sentence_embeddings = average_pool(
+                    outputs.last_hidden_state, encoded_input["attention_mask"]
+                )
+        sentence_embeddings_np = sentence_embeddings.numpy()
+        sentence_embeddings_list.append(sentence_embeddings_np)
+
+        # Clear temporary variables to free up memory
+        # del encoded_input, outputs, sentence_embeddings
+        del sentence_embeddings
+        gc.collect()
+
+    return np.concatenate(sentence_embeddings_list, axis=0)
 
 
 def one_hot(df):
