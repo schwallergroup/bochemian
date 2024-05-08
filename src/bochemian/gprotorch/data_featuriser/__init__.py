@@ -18,6 +18,10 @@ from .featurisation import (
     precalculated,
     ada_embeddings,
     e5_mistral_embeddings,
+    t5chem_embeddings,
+    t5chem_embeddings_weighted,
+    llama,
+    voyageai_embeddings,
 )
 
 __all__ = [
