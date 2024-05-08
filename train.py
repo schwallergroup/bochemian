@@ -449,7 +449,7 @@ def train(config):
     surrogate_model_config = config["surrogate_model"]
     acquisition_config = config["acquisition"]
     finetune = bo_config["finetuning"]
-
+    print(dm.train_y, "train objectives")
     bo = BotorchOptimizer(
         original_train_x=dm.train_x.clone(),
         original_heldout_x=dm.heldout_x.clone(),

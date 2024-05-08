@@ -1,0 +1,24 @@
+details:
+
+components:
+  - reactant_1_smiles
+  - reactant_2_smiles
+  - ligand_smiles
+  - reagent_1_smiles
+  - solvent_1_smiles
+  - catalyst_smiles
+
+template: |
+  Suzuki-Miyaura Cross-Coupling Reaction:
+  
+  Components:
+  - Electrophile: {reactant_1_smiles_details}
+  - Boronic Acid Derivative: {reactant_2_smiles_details}
+  - Catalyst: {catalyst_smiles_details}
+  - Ligand: {ligand_smiles_details} (0.05 M in toluene)
+  - Base: {reagent_1_smiles_details}
+  - Solvent: {solvent_1_smiles_details} (9:1 with solvent: H2O)
+  
+  Procedure:
+  1. Prepared by aspiration of 1 µL of components using an Agilent autosampler into solvent.
+  2. Run at 1 mL/min, 100 °C, 1 min, 100 bar in a Hastelloy coil.

@@ -1,0 +1,15 @@
+details:
+
+components:
+  - ligand
+  - aryl halide
+  - additive
+  - base
+
+template: |
+  Reaction Setup
+  The following solutions were prepared in DMSO:
+  - Ligand: {ligand_details}
+  - Aryl halide: {aryl halide_details}
+  - Additive: {additive_details}
+  - Base: {base_details}

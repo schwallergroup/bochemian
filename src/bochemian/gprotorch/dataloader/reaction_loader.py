@@ -9,6 +9,9 @@ from bochemian.gprotorch.data_featuriser import (
     rxnfp2,
     precalculated,
     ada_embeddings,
+    t5chem_embeddings,
+    t5chem_embeddings_weighted,
+    llama,
 )
 from bochemian.gprotorch.dataloader import DataLoader
 from ast import literal_eval
@@ -59,6 +62,7 @@ class ReactionLoader(DataLoader):
             "gpt2",
             "precalculated",
             "ada_embeddings",
+            "t5chem_embeddings",
         ]
 
         if representation == "ohe":
@@ -141,9 +145,14 @@ class ReactionLoader(DataLoader):
             # drop nans from the datasets
             nans = df[benchmarks[benchmark]["labels"]].isnull().to_list()
             nan_indices = [nan for nan, x in enumerate(nans) if x]
-            self.features = df[benchmarks[benchmark]["features"]].drop(nan_indices)
+            self.features = df[benchmarks[benchmark]["features"]].drop(
+                nan_indices
+            )
             self.labels = (
-                df[benchmarks[benchmark]["labels"]].dropna().to_numpy().reshape(-1, 1)
+                df[benchmarks[benchmark]["labels"]]
+                .dropna()
+                .to_numpy()
+                .reshape(-1, 1)
             )
 
 

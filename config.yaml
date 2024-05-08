@@ -2,7 +2,7 @@ data:
   class_path: bochemian.data.module.BaseDataModule
   init_args:
     data_path: data/processed/bh_reaction_1_procedure_template_basic.csv
-    input_column: instructor_embeddings
+    input_column: instructor_normalized
     target_column: yield
     featurizer:
       class_path: bochemian.data.module.Featurizer
@@ -13,6 +13,7 @@ data:
       class_path: bochemian.initialization.initializers.BOInitializer
       init_args:
         method: kmeans
+        # predefined_points: [386, 445, 311, 302, 247, 502, 104, 784, 39, 498]
         metric: jaccard
         n_clusters: 10
         init: k-means++
@@ -66,7 +67,7 @@ surrogate_model:
         eps: 1.0e-06
     mean_module: null
     standardize: true
-    normalize: true
+    normalize: false
     initial_noise_val: 1.0
     noise_constraint: 1.0e-04
     initial_outputscale_val: 1.0

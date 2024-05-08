@@ -1,0 +1,12 @@
+details:
+
+components:
+  - ligand
+  - aryl halide
+  - additive
+  - base
+
+template: |
+  Reaction Setup
+  The following solutions were prepared in DMSO: catalyst (0.05 M): {ligand_details}, aryl halide (0.50 M): {aryl halide_details}, toluidine (0.50 M), additive (0.50 M): {additive_details}, and base (0.75 M): {base_details}. 
+  These solutions were added to a 384-well source plate (80 µL per well). The Mosquito HTS liquid handling robot was used to dose each of these solutions (200 nL each) into a 1536-well plate. The plate was sealed and heated to 60 °C. After 16 h, the plate was opened and the Mosquito was used to add internal standard to each well (3 µL of 0.0025 M di-tert-butylbiphenyl solution in DMSO). At that point, aliquots were sampled into 384-well plates and analyzed by UPLC.
