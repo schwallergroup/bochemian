@@ -169,6 +169,7 @@ class BOInitializer:
         seed: int = None,
         predefined_points: List[int] = None,
     ):
+        self.seed = seed
         self.n_clusters = n_clusters
         self.methods = {
             "predefined": PredefinedInitializer,
@@ -184,7 +185,7 @@ class BOInitializer:
             n_clusters=n_clusters,
             init_method=init,
             use_pca=use_pca,
-            seed=seed,
+            seed=self.seed,
             predefined_points=predefined_points,
         )
         self.selected_reactions = None

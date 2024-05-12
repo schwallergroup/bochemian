@@ -2,6 +2,7 @@ from bochemian.data.module import BaseDataModule
 from bochemian.bo.optimizer import BotorchOptimizer
 from bochemian.data.utils import torch_delete_rows
 from bochemian.finetuning.training import beta_scheduler
+from bochemian.initialization.initializers import BOInitializer
 import torch
 from pytorch_lightning import seed_everything
 import wandb
@@ -441,8 +442,20 @@ def retrieve_indices(heldout_x, x_next):
     return indices
 
 
+import pandas as pd
+
+
 def train(config):
-    dm = instantiate_class(config["data"])
+    # dm = instantiate_class(config["data"])
+    initializer = instantiate_class(
+        config["data"]["init_args"]["initializer"], seed=config["seed"]
+    )
+    featurizer = instantiate_class(config["data"]["init_args"]["featurizer"])
+    dm = instantiate_class(
+        config["data"], initializer=initializer, featurizer=featurizer
+    )
+    dataset = pd.read_csv(config["data"]["init_args"]["data_path"])
+    max_value = dataset[config["data"]["init_args"]["target_column"]].max()
     data_metrics = calculate_data_metrics(dm)
     log_data_stats(data_metrics)
     bo_config = config["bo"]["init_args"]

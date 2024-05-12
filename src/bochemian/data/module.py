@@ -79,6 +79,9 @@ class BaseDataModule(pl.LightningDataModule, ABC):
     def load_data(self):
         self.data = pd.read_csv(self.data_path)
         self.original_indices = np.arange(len(self.data))
+        self.exclude = self.data[
+            self.data[self.target_column] > 0.5 * self.data[self.target_column].max()
+        ].index.tolist()
 
     def featurize_data(self):
         x = self.featurizer.featurize(self.data[self.input_column])
@@ -97,11 +100,13 @@ class BaseDataModule(pl.LightningDataModule, ABC):
         self.y = torch_delete_rows(self.y, duplicates)
 
     def split_data(self):
-        init_indexes, _ = self.initializer.fit(self.x, exclude=None)
+        init_indexes, _ = self.initializer.fit(self.x, exclude=self.exclude)
 
         print(f"Selected reactions: {init_indexes}")
         self.train_indexes = init_indexes
-        self.heldout_indices = torch.from_numpy(np.delete(self.original_indices, init_indexes))
+        self.heldout_indices = torch.from_numpy(
+            np.delete(self.original_indices, init_indexes)
+        )
 
         self.train_x = self.x[init_indexes]
         self.heldout_x = torch_delete_rows(self.x, init_indexes)
