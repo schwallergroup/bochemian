@@ -42,7 +42,7 @@ class BotorchOptimizer:
         batch_size: int = 1,
         fixed_features: Optional[Dict[int, float]] = None,
         tkwargs: Optional[Dict[str, Any]] = {
-            "device": torch.device("cpu"),
+            "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
             "dtype": torch.double,
         },
         finetuning: bool = False,
@@ -59,7 +59,8 @@ class BotorchOptimizer:
             self.emb_criterion = LogRatioLossTorch()
         elif emb_criterion == "triplet":
             self.emb_criterion = TripletLossTorch(threshold=threshold, margin=margin)
-        else: self.emb_criterion = None
+        else:
+            self.emb_criterion = None
         self.design_space = design_space
         self.surrogate_model_config = (
             surrogate_model_config or BotorchOptimizer.default_surrogate_model_config()
@@ -92,13 +93,13 @@ class BotorchOptimizer:
         train_x = train_x.to(**tkwargs) if train_x is not None else None
         train_y = train_y.to(**tkwargs) if train_y is not None else None
 
-        self.original_train_x = original_train_x
-        self.original_heldout_x = original_heldout_x
+        self.original_train_x = original_train_x.to(**tkwargs)
+        self.original_heldout_x = original_heldout_x.to(**tkwargs)
+        self.tkwargs = tkwargs
+        print("Using device:", self.tkwargs["device"])
 
         if train_x is not None and train_y is not None:
             self.tell(train_x, train_y)
-
-        self.tkwargs = tkwargs
 
     def define_design_space(
         self, train_x: Optional[torch.Tensor] = None, raw_samples: int = 10000
@@ -174,6 +175,7 @@ class BotorchOptimizer:
 
         candidates = []
         candidate_indices = []
+
         for i in range(n_points):
             candidate, idx = self.next_evaluations(
                 self.acq_function,
@@ -244,7 +246,9 @@ class BotorchOptimizer:
             if self.finetuning:
                 embedding_dim = self.original_train_x.shape[1]
                 self.finetuning_model = FineTuningModel(embedding_dim, 1)
-                self.finetuning_model.to(self.train_x.dtype)
+                # self.finetuning_model.to(self.train_x.dtype)
+                self.finetuning_model.to(**self.tkwargs)
+
                 finetuning_train_dataset = FineTuningDataset(
                     self.original_train_x.clone(), self.train_y.clone()
                 )

@@ -163,7 +163,7 @@ def calculate_model_fit_metrics(
     train_y,
     heldout_x,
     heldout_y,
-    enable_logging_images=True,
+    enable_logging_images=False,
     epoch=0,
 ):
     predictions_valid, var_valid = model.predict(
@@ -175,16 +175,18 @@ def calculate_model_fit_metrics(
     if enable_logging_images:
         plotting_utils = BOPlotter()
         pred_vs_gt_fig_train = plotting_utils.plot_predicted_vs_actual(
-            predictions_train,
-            train_y,
-            var_train.sqrt(),
+            to_numpy(predictions_train),
+            to_numpy(train_y),
+            to_numpy(var_train.sqrt()),
         )
         pred_vs_gt_fig_valid = plotting_utils.plot_predicted_vs_actual(
-            predictions_valid,
-            heldout_y,
-            var_valid.sqrt(),
+            to_numpy(predictions_valid),
+            to_numpy(heldout_y),
+            to_numpy(var_valid.sqrt()),
         )
-        residuals_figure = plotting_utils.plot_residuals(predictions_valid, heldout_y)
+        residuals_figure = plotting_utils.plot_residuals(
+            to_numpy(predictions_valid), to_numpy(heldout_y)
+        )
         wandb.log(
             {"train/pred-vs-gt": wandb.Image(pred_vs_gt_fig_train), "epoch": epoch}
         )
@@ -193,13 +195,13 @@ def calculate_model_fit_metrics(
         )
         wandb.log({"residuals": wandb.Image(residuals_figure), "epoch": epoch})
 
-    mse_valid = mean_squared_error(heldout_y, predictions_valid)
-    r2_valid = r2_score(heldout_y, predictions_valid)
-    mae_valid = mean_absolute_error(heldout_y, predictions_valid)
+    mse_valid = mean_squared_error(to_numpy(heldout_y), to_numpy(predictions_valid))
+    r2_valid = r2_score(to_numpy(heldout_y), to_numpy(predictions_valid))
+    mae_valid = mean_absolute_error(to_numpy(heldout_y), to_numpy(predictions_valid))
 
-    mse_train = mean_squared_error(train_y, predictions_train)
-    r2_train = r2_score(train_y, predictions_train)
-    mae_train = mean_absolute_error(train_y, predictions_train)
+    mse_train = mean_squared_error(to_numpy(train_y), to_numpy(predictions_train))
+    r2_train = r2_score(to_numpy(train_y), to_numpy(predictions_train))
+    mae_train = mean_absolute_error(to_numpy(train_y), to_numpy(predictions_train))
 
     pred_dist_valid = model.posterior(heldout_x, observation_noise=True)
     pred_dist_train = model.posterior(train_x, observation_noise=True)
@@ -249,6 +251,11 @@ import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
 
 
+def to_numpy(tensor):
+    """Convert a PyTorch tensor to a NumPy array."""
+    return tensor.cpu().numpy() if tensor.is_cuda else tensor.numpy()
+
+
 def plot_tsne_to_wandb(
     epoch,
     original_embeddings,
@@ -260,21 +267,21 @@ def plot_tsne_to_wandb(
 ):
     # Calculate t-SNE for the original and fine-tuned embeddings
     original_tsne = TSNE(n_components=2, random_state=42, init="pca").fit_transform(
-        original_embeddings.numpy()
+        to_numpy(original_embeddings)
     )
     fine_tuned_tsne = TSNE(n_components=2, random_state=42, init="pca").fit_transform(
-        fine_tuned_embeddings.detach().numpy()
+        to_numpy(fine_tuned_embeddings.detach())
     )
     finefine_tuned_tsne = TSNE(
         n_components=2, random_state=42, init="pca"
-    ).fit_transform(finefine_tuned_embeddings.detach().numpy())
+    ).fit_transform(to_numpy(finefine_tuned_embeddings.detach()))
 
     # Create figure with subplots
     fig, (ax1, ax2, ax3, ax4, ax5) = plt.subplots(1, 5, figsize=(20, 6))
 
     # Original Embeddings t-SNE plot
     scatter1 = ax1.scatter(
-        original_tsne[:, 0], original_tsne[:, 1], c=yields, cmap="viridis"
+        original_tsne[:, 0], original_tsne[:, 1], c=to_numpy(yields), cmap="viridis"
     )
     ax1.set_title("Original Embeddings t-SNE")
     ax1.set_xlabel("Component 1")
@@ -282,7 +289,7 @@ def plot_tsne_to_wandb(
 
     # Fine-Tuned Embeddings t-SNE plot
     scatter2 = ax2.scatter(
-        fine_tuned_tsne[:, 0], fine_tuned_tsne[:, 1], c=yields, cmap="viridis"
+        fine_tuned_tsne[:, 0], fine_tuned_tsne[:, 1], c=to_numpy(yields), cmap="viridis"
     )
     ax2.set_title("Fine-Tuned Embeddings t-SNE")
     ax2.set_xlabel("Component 1")
@@ -294,7 +301,7 @@ def plot_tsne_to_wandb(
         scatter3 = ax3.scatter(
             fine_tuned_tsne[:, 0],
             fine_tuned_tsne[:, 1],
-            c=predicted_yields,
+            c=to_numpy(predicted_yields),
             cmap="viridis",
         )
 
@@ -302,7 +309,7 @@ def plot_tsne_to_wandb(
             finefine_tuned_tsne[:, 0],
             finefine_tuned_tsne[:, 1],
             # HERE AS WELL
-            c=yields,
+            c=to_numpy(yields),
             cmap="viridis",
         )
 
@@ -322,7 +329,7 @@ def plot_tsne_to_wandb(
         scatter4 = ax4.scatter(
             fine_tuned_tsne[:, 0],
             fine_tuned_tsne[:, 1],
-            c=predicted_yields.squeeze().numpy(),
+            c=to_numpy(predicted_yields),
             cmap="viridis",
         )
     ax4.set_title("GP predictions t-SNE")
@@ -491,7 +498,7 @@ def train(config):
         x_next = bo.ask(n_points=bo_config["batch_size"])
         x_next = torch.stack(x_next)
         matches = (bo.heldout_x.unsqueeze(0) == x_next).all(dim=-1)
-        indices = matches.nonzero(as_tuple=True)[1]
+        indices = matches.nonzero(as_tuple=True)[1].to("cpu")
 
         # TODO: this is not correct update
         if not torch.all(matches.sum(dim=-1) == 1):
@@ -501,7 +508,7 @@ def train(config):
         y_next = bo.heldout_y[indices]
 
         wandb.log(
-            {"evaluated_suggestions": wandb.Histogram(y_next.numpy()), "epoch": i}
+            {"evaluated_suggestions": wandb.Histogram(to_numpy(y_next)), "epoch": i}
         )
 
         # Ensure that y_next and x_next have the correct shape
@@ -510,7 +517,7 @@ def train(config):
         # Get the number of top n% points found in the current batch
         found_top_n = calculate_top_n_metrics(dm.y, bo.train_y, quantile=0.99)
         wandb.log({"train/found_top_n": found_top_n, "epoch": i})
-        log_data_metrics(data_metrics, bo.train_y, epoch=i)
+        log_data_metrics(data_metrics, bo.train_y.cpu(), epoch=i)
 
         # Update the current maximum if a larger value was observed
         current_max = max(current_max, torch.max(y_next))
@@ -550,7 +557,7 @@ def train(config):
 
         if finetune:
             if (
-                i == 1 or i == config["n_iters"] - 1
+                i == -1 or i == config["n_iters"] - 1 + 2
             ):  # plot the first and last iteration
                 plot_tsne_to_wandb(
                     i,
@@ -567,10 +574,13 @@ def train(config):
                     high_to_low_distances_finetuned,
                     low_to_low_distances_finetuned,
                 ) = calculate_distances(
-                    torch.cat(
-                        [bo.finetuned_train_embeddings, bo.finetuned_embeddings], dim=0
+                    to_numpy(
+                        torch.cat(
+                            [bo.finetuned_train_embeddings, bo.finetuned_embeddings],
+                            dim=0,
+                        )
                     ),
-                    torch.cat([bo.train_y, bo.heldout_y], dim=0),
+                    to_numpy(torch.cat([bo.train_y, bo.heldout_y], dim=0)),
                 )
 
                 (
@@ -578,8 +588,10 @@ def train(config):
                     high_to_low_distances_original,
                     low_to_low_distances_original,
                 ) = calculate_distances(
-                    torch.cat([bo.original_train_x, bo.original_heldout_x], dim=0),
-                    torch.cat([bo.train_y, bo.heldout_y], dim=0),
+                    to_numpy(
+                        torch.cat([bo.original_train_x, bo.original_heldout_x], dim=0)
+                    ),
+                    to_numpy(torch.cat([bo.train_y, bo.heldout_y], dim=0)),
                 )
 
                 (
@@ -587,8 +599,8 @@ def train(config):
                     high_to_low_distances_concat,
                     low_to_low_distances_concat,
                 ) = calculate_distances(
-                    torch.cat([bo.train_x, bo.heldout_x], dim=0),
-                    torch.cat([bo.train_y, bo.heldout_y], dim=0),
+                    to_numpy(torch.cat([bo.train_x, bo.heldout_x], dim=0)),
+                    to_numpy(torch.cat([bo.train_y, bo.heldout_y], dim=0)),
                 )
 
                 data_high_to_high_distances_concat = [
