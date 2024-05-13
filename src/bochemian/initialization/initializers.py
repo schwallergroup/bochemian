@@ -51,10 +51,10 @@ class RandomInitializer(Initializer):
         self.seed = seed
 
     def fit(self, x, exclude=None):
-        x_init = torch_delete_rows(x, exclude)
+        # x_init = torch_delete_rows(x, exclude)
         return (
             np.random.default_rng(seed=self.seed)
-            .permutation(len(x_init))[: self.n_clusters]
+            .permutation(len(x))[: self.n_clusters]
             .tolist(),
             {},
         )
@@ -192,7 +192,8 @@ class BOInitializer:
 
     def fit(self, x, exclude: list = None):
         x_init = torch_delete_rows(x, exclude)
-        selected_reactions, clusters = self.initializer.fit(x, exclude)
+        print(x_init.shape)
+        selected_reactions, clusters = self.initializer.fit(x_init, exclude)
         self.selected_reactions = [
             get_original_index(x_init.numpy()[i], x) for i in selected_reactions
         ]

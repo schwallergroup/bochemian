@@ -12,6 +12,7 @@ from bochemian.gprotorch.data_featuriser import (
     t5chem_embeddings,
     t5chem_embeddings_weighted,
     llama,
+    all_continuous,
 )
 from bochemian.gprotorch.dataloader import DataLoader
 from ast import literal_eval
@@ -67,6 +68,9 @@ class ReactionLoader(DataLoader):
 
         if representation == "ohe":
             self.features = one_hot(self.features)
+
+        elif representation == "all_continuous":
+            self.features = all_continuous(self.features)
 
         elif representation == "rxnfp":
             self.features = rxnfp(self.features.to_list())

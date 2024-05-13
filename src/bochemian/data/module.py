@@ -79,9 +79,9 @@ class BaseDataModule(pl.LightningDataModule, ABC):
     def load_data(self):
         self.data = pd.read_csv(self.data_path)
         self.original_indices = np.arange(len(self.data))
-        self.exclude = self.data[
-            self.data[self.target_column] > 0.5 * self.data[self.target_column].max()
-        ].index.tolist()
+        # self.exclude = self.data[
+        #     self.data[self.target_column] > 0.5 * self.data[self.target_column].max()
+        # ].index.tolist()
 
     def featurize_data(self):
         x = self.featurizer.featurize(self.data[self.input_column])
@@ -100,6 +100,11 @@ class BaseDataModule(pl.LightningDataModule, ABC):
         self.y = torch_delete_rows(self.y, duplicates)
 
     def split_data(self):
+        indices = torch.arange(len(self.y))
+        median_value = self.y.median()
+        condition = self.y > median_value
+        self.exclude = indices[condition.squeeze()].tolist()
+
         init_indexes, _ = self.initializer.fit(self.x, exclude=self.exclude)
 
         print(f"Selected reactions: {init_indexes}")

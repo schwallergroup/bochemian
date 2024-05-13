@@ -202,7 +202,7 @@ def get_huggingface_embeddings(
                 raise ValueError(f"Unknown pooling method: {pooling_method}")
             if normalize_embeddings:
                 pooled = F.normalize(pooled, p=2, dim=1)
-            embeddings_list.append(pooled.cpu().numpy()) 
+            embeddings_list.append(pooled.cpu().numpy())
 
         del encoded_input, outputs, pooled
         torch.cuda.empty_cache()
@@ -829,6 +829,10 @@ def llama(texts, model_name="Meta-Llama-3-8B", type="prompt-last-token"):
         gc.collect()
 
     return np.concatenate(sentence_embeddings_list, axis=0)
+
+
+def all_continuous(df):
+    return df.to_numpy(dtype=np.float64)
 
 
 def one_hot(df):

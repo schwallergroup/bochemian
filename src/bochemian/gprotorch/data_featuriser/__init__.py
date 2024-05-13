@@ -22,6 +22,7 @@ from .featurisation import (
     t5chem_embeddings_weighted,
     llama,
     voyageai_embeddings,
+    all_continuous,
 )
 
 __all__ = [
@@ -39,4 +40,5 @@ __all__ = [
     "mqn_features",
     "drfpfingerprints",
     "precalculated",
+    "all_continuous",
 ]
